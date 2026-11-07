@@ -15,30 +15,35 @@ from flask_login import (
     login_required, logout_user, current_user
 )
 
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
+from markupsafe import escape
 
 
 # ==========================================
-# APP CONFIGURATION
+# CONFIGURATION
 # ==========================================
 
 app = Flask(__name__)
 
 app.config["SECRET_KEY"] = os.environ.get(
-    "SECRET_KEY", secrets.token_hex(32)
+    "SECRET_KEY", "CHANGE-THIS-TO-A-LONG-RANDOM-SECRET"
 )
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+database_url = os.environ.get(
     "DATABASE_URL", "sqlite:///adnova.db"
-).replace("postgres://", "postgresql://")
+)
 
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace(
+        "postgres://", "postgresql://", 1
+    )
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-
-# HTTPS hosting par secure cookies
 app.config["SESSION_COOKIE_SECURE"] = (
     os.environ.get("COOKIE_SECURE", "false").lower() == "true"
 )
@@ -52,39 +57,70 @@ login_manager.login_view = "login"
 
 
 # ==========================================
-# DATABASE MODELS
+# DATABASE
 # ==========================================
 
 class Device(db.Model):
+
     id = db.Column(db.Integer, primary_key=True)
-    device_hash = db.Column(db.String(64), unique=True, nullable=False)
-    extra_slots = db.Column(db.Integer, default=0)
+
+    device_hash = db.Column(
+        db.String(64), unique=True, nullable=False
+    )
+
+    extra_slots = db.Column(
+        db.Integer, default=0, nullable=False
+    )
 
 
 class User(UserMixin, db.Model):
+
     id = db.Column(db.Integer, primary_key=True)
 
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    username = db.Column(
+        db.String(50), unique=True, nullable=False
+    )
 
-    password = db.Column(db.String(255), nullable=False)
+    email = db.Column(
+        db.String(120), unique=True, nullable=False
+    )
 
-    device_hash = db.Column(db.String(64), nullable=False)
+    password = db.Column(
+        db.String(255), nullable=False
+    )
 
-    balance = db.Column(db.Float, default=0)
+    device_hash = db.Column(
+        db.String(64), nullable=False
+    )
 
-    is_admin = db.Column(db.Boolean, default=False)
+    balance = db.Column(
+        db.Float, default=0
+    )
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_admin = db.Column(
+        db.Boolean, default=False
+    )
+
+    created_at = db.Column(
+        db.DateTime, default=datetime.utcnow
+    )
 
 
 class Activity(db.Model):
+
     id = db.Column(db.Integer, primary_key=True)
 
-    user_id = db.Column(db.Integer, nullable=False)
-    action = db.Column(db.String(200), nullable=False)
+    user_id = db.Column(
+        db.Integer, nullable=False
+    )
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    action = db.Column(
+        db.String(200), nullable=False
+    )
+
+    created_at = db.Column(
+        db.DateTime, default=datetime.utcnow
+    )
 
 
 @login_manager.user_loader
@@ -93,11 +129,13 @@ def load_user(user_id):
 
 
 # ==========================================
-# SECURITY HELPERS
+# SECURITY FUNCTIONS
 # ==========================================
 
 def hash_device(token):
-    return hashlib.sha256(token.encode()).hexdigest()
+    return hashlib.sha256(
+        token.encode()
+    ).hexdigest()
 
 
 def get_device_token():
@@ -105,12 +143,14 @@ def get_device_token():
 
 
 def log_activity(user_id, action):
-    activity = Activity(
-        user_id=user_id,
-        action=action
+
+    db.session.add(
+        Activity(
+            user_id=user_id,
+            action=action
+        )
     )
 
-    db.session.add(activity)
     db.session.commit()
 
 
@@ -121,7 +161,7 @@ def admin_required(function):
     def wrapper(*args, **kwargs):
 
         if not current_user.is_admin:
-            flash("Admin permission required.", "error")
+            flash("Admin permission required.")
             return redirect(url_for("dashboard"))
 
         return function(*args, **kwargs)
@@ -155,15 +195,11 @@ content="width=device-width, initial-scale=1">
 }
 
 body {
-
     min-height: 100vh;
-
     font-family: Arial, sans-serif;
-
     color: white;
 
-    background:
-    linear-gradient(
+    background: linear-gradient(
         -45deg,
         #070817,
         #171034,
@@ -172,395 +208,244 @@ body {
     );
 
     background-size: 400% 400%;
-
     animation: gradient 15s ease infinite;
-
     overflow-x: hidden;
 }
 
 @keyframes gradient {
-
-    0% {
-        background-position: 0% 50%;
-    }
-
-    50% {
-        background-position: 100% 50%;
-    }
-
-    100% {
-        background-position: 0% 50%;
-    }
-
+    0% {background-position: 0% 50%;}
+    50% {background-position: 100% 50%;}
+    100% {background-position: 0% 50%;}
 }
 
 .orb {
-
     position: fixed;
-
     width: 250px;
     height: 250px;
-
     border-radius: 50%;
-
     filter: blur(100px);
-
     opacity: .22;
-
     pointer-events: none;
-
     z-index: -1;
 }
 
 .orb.one {
-
     background: #7b45ff;
-
     top: 5%;
     left: -100px;
 }
 
 .orb.two {
-
     background: #00d9ff;
-
     right: -100px;
     bottom: 5%;
 }
 
 .navbar {
-
     display: flex;
-
     justify-content: space-between;
-
     align-items: center;
-
     padding: 20px 7%;
-
     border-bottom: 1px solid #ffffff15;
-
     background: #090d1c88;
-
     backdrop-filter: blur(20px);
-
 }
 
 .logo {
-
     font-size: 25px;
-
     font-weight: bold;
-
     letter-spacing: 3px;
-
     color: #69eaff;
-
     text-shadow: 0 0 20px #398cff;
-
 }
 
 .navlinks a {
-
     margin-left: 15px;
-
     color: #c9d5f7;
-
     text-decoration: none;
-
     font-size: 13px;
-
 }
 
 .navlinks a:hover {
-
     color: #65e6ff;
-
 }
 
 .container {
-
     width: 92%;
-
     max-width: 1100px;
-
     margin: 45px auto;
-
 }
 
 .box {
-
     max-width: 460px;
-
     margin: 45px auto;
-
     padding: 30px;
-
     border: 1px solid #ffffff20;
-
     border-radius: 24px;
-
     background: #ffffff0c;
-
     backdrop-filter: blur(25px);
-
     box-shadow: 0 20px 70px #00000055;
-
     animation: appear .7s ease;
-
 }
 
 @keyframes appear {
-
     from {
-
         opacity: 0;
-
         transform: translateY(25px);
-
     }
-
     to {
-
         opacity: 1;
-
         transform: translateY(0);
-
     }
-
 }
 
 h1 {
-
     font-size: 34px;
-
     color: #72edff;
-
     text-shadow: 0 0 20px #398cff66;
-
     margin-bottom: 18px;
-
 }
 
 h2 {
-
     font-size: 24px;
-
     margin-bottom: 12px;
-
 }
 
 h3 {
-
     color: #b9caff;
-
     margin-bottom: 12px;
-
 }
 
 p {
-
     color: #b9c5dc;
-
     line-height: 1.7;
-
 }
 
 input {
-
     width: 100%;
-
     padding: 15px;
-
     margin: 10px 0;
-
     border-radius: 12px;
-
     border: 1px solid #ffffff20;
-
     background: #10172d;
-
     color: white;
-
     outline: none;
-
 }
 
 input:focus {
-
     border-color: #65e6ff;
-
     box-shadow: 0 0 15px #397cff66;
-
 }
 
 button, .button {
-
     display: inline-block;
-
     width: 100%;
-
     padding: 15px;
-
     margin-top: 12px;
-
     border: none;
-
     border-radius: 12px;
-
     background: linear-gradient(
         100deg,
         #7554ff,
         #20c9ed
     );
-
     color: white;
-
     font-weight: bold;
-
     text-align: center;
-
     text-decoration: none;
-
     cursor: pointer;
-
     transition: .3s;
-
 }
 
 button:hover, .button:hover {
-
     transform: translateY(-3px);
-
     box-shadow: 0 8px 25px #635bff77;
+}
 
+button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .card {
-
     padding: 23px;
-
     margin: 15px 0;
-
     border: 1px solid #ffffff18;
-
     border-radius: 18px;
-
     background: linear-gradient(
         135deg,
         #ffffff12,
         #ffffff04
     );
-
     transition: .3s;
-
 }
 
 .card:hover {
-
     transform: translateY(-5px);
-
     border-color: #65e6ff88;
-
     box-shadow: 0 10px 30px #287dff22;
-
 }
 
 .grid {
-
     display: grid;
-
     grid-template-columns:
     repeat(auto-fit, minmax(220px, 1fr));
-
     gap: 15px;
-
 }
 
 .balance {
-
     font-size: 32px;
-
     color: #65e6ff;
-
     font-weight: bold;
-
     margin-top: 10px;
-
 }
 
 a {
-
     color: #65e6ff;
-
     text-decoration: none;
-
 }
 
 .alert {
-
     padding: 13px;
-
     margin-bottom: 15px;
-
     background: #ffffff12;
-
     border-radius: 10px;
-
     color: #a9eaff;
-
 }
 
 .small {
-
     font-size: 12px;
-
     color: #8d9bb9;
-
 }
 
 .footer {
-
     text-align: center;
-
     padding: 25px;
-
     color: #8793ae;
-
     font-size: 12px;
-
 }
 
 @media(max-width:600px) {
 
     .navbar {
-
         padding: 18px 5%;
-
         flex-direction: column;
-
         gap: 15px;
-
     }
 
     .navlinks a {
-
         margin: 0 6px;
-
     }
 
     .container {
-
         margin: 25px auto;
-
     }
 
     .box {
-
         padding: 22px;
-
     }
-
 }
 
 </style>
@@ -581,17 +466,14 @@ a {
 {% if logged_in %}
 
 <a href="/dashboard">Dashboard</a>
-
 <a href="/profile">Profile</a>
-
+<a href="/activity">Activity</a>
 <a href="/logout">Logout</a>
 
 {% else %}
 
 <a href="/">Home</a>
-
 <a href="/login">Login</a>
-
 <a href="/register">Register</a>
 
 {% endif %}
@@ -625,18 +507,26 @@ a {
 </div>
 
 <div class="footer">
-
 ADNOVA © 2026 | Watch Ads. Earn Rewards.
-
 </div>
 
 </body>
-
 </html>
 """
 
 
+# ==========================================
+# PAGE RENDERER - CSRF FIX
+# ==========================================
+
 def render_page(content, title="ADNOVA"):
+
+    token = generate_csrf()
+
+    content = content.replace(
+        "__CSRF_TOKEN__",
+        token
+    )
 
     return render_template_string(
         PAGE,
@@ -647,7 +537,7 @@ def render_page(content, title="ADNOVA"):
 
 
 # ==========================================
-# HOME PAGE
+# HOME
 # ==========================================
 
 @app.route("/")
@@ -676,16 +566,12 @@ def home():
         </div>
 
         <a class="button" href="/register">
-            Create Account
+            CREATE ACCOUNT
         </a>
 
         <a class="button" href="/login">
-            Login
+            LOGIN
         </a>
-
-        <p class="small" style="text-align:center;margin-top:20px">
-            Premium rewards experience
-        </p>
 
     </div>
     """
@@ -766,7 +652,7 @@ def register():
 
             flash(
                 "Device account limit reached. "
-                "Contact the administrator."
+                "Contact administrator."
             )
 
             return redirect(url_for("register"))
@@ -823,12 +709,14 @@ def register():
 
             <input type="hidden"
             name="csrf_token"
-            value="{{ csrf_token() }}">
+            value="__CSRF_TOKEN__">
 
             <input
                 name="username"
                 placeholder="Username"
                 required
+                minlength="3"
+                maxlength="50"
             >
 
             <input
@@ -843,6 +731,7 @@ def register():
                 type="password"
                 placeholder="Password (minimum 8 characters)"
                 required
+                minlength="8"
             >
 
             <button type="submit">
@@ -914,7 +803,7 @@ def login():
 
             <input type="hidden"
             name="csrf_token"
-            value="{{ csrf_token() }}">
+            value="__CSRF_TOKEN__">
 
             <input
                 type="email"
@@ -961,18 +850,24 @@ def dashboard():
 
         admin_link = """
         <div class="card">
+
             <h3>Administrator</h3>
+
             <p>Manage users and device approvals.</p>
+
             <a class="button" href="/admin">
                 OPEN ADMIN PANEL
             </a>
+
         </div>
         """
+
+    username = escape(current_user.username)
 
     content = f"""
     <h1>Dashboard</h1>
 
-    <p>Welcome back, {current_user.username}.</p>
+    <p>Welcome back, {username}.</p>
 
     <div class="grid">
 
@@ -1046,7 +941,6 @@ def dashboard():
     </div>
 
     {admin_link}
-
     """
 
     return render_page(content, "Dashboard")
@@ -1060,45 +954,35 @@ def dashboard():
 @login_required
 def profile():
 
+    username = escape(current_user.username)
+    email = escape(current_user.email)
+
     content = f"""
     <h1>My Profile</h1>
 
     <div class="card">
-
         <h3>Username</h3>
-
-        <p>{current_user.username}</p>
-
+        <p>{username}</p>
     </div>
 
     <div class="card">
-
         <h3>Email</h3>
-
-        <p>{current_user.email}</p>
-
+        <p>{email}</p>
     </div>
 
     <div class="card">
-
         <h3>Balance</h3>
-
         <div class="balance">
             Rs. {current_user.balance:.2f}
         </div>
-
     </div>
 
     <div class="card">
-
         <h3>Account Created</h3>
-
         <p>
             {current_user.created_at.strftime("%d %B %Y")}
         </p>
-
     </div>
-
     """
 
     return render_page(content, "Profile")
@@ -1130,10 +1014,12 @@ def activity():
 
     for record in records:
 
+        action = escape(record.action)
+
         content += f"""
         <div class="card">
 
-            <h3>{record.action}</h3>
+            <h3>{action}</h3>
 
             <p class="small">
                 {record.created_at.strftime("%d %B %Y %H:%M")}
@@ -1187,13 +1073,16 @@ def admin():
 
         extra_slots = device.extra_slots if device else 0
 
+        username = escape(user.username)
+        email = escape(user.email)
+
         content += f"""
 
         <div class="card">
 
-            <h3>{user.username}</h3>
+            <h3>{username}</h3>
 
-            <p>Email: {user.email}</p>
+            <p>Email: {email}</p>
 
             <p>Device accounts: {device_count}</p>
 
@@ -1206,7 +1095,7 @@ def admin():
 
                 <input type="hidden"
                 name="csrf_token"
-                value="{{{{ csrf_token() }}}}">
+                value="__CSRF_TOKEN__">
 
                 <input
                     type="number"
@@ -1224,14 +1113,13 @@ def admin():
             </form>
 
         </div>
-
         """
 
     return render_page(content, "Admin")
 
 
 # ==========================================
-# ADMIN DEVICE APPROVAL
+# ADMIN APPROVAL
 # ==========================================
 
 @app.route(
@@ -1244,25 +1132,17 @@ def approve(user_id):
     user = db.session.get(User, user_id)
 
     if not user:
-
         flash("User not found.")
-
         return redirect(url_for("admin"))
 
     try:
-
         slots = int(request.form.get("slots", 0))
-
     except ValueError:
-
         flash("Invalid number.")
-
         return redirect(url_for("admin"))
 
     if slots < 1 or slots > 10:
-
         flash("Enter a number between 1 and 10.")
-
         return redirect(url_for("admin"))
 
     device = Device.query.filter_by(
@@ -1284,7 +1164,7 @@ def approve(user_id):
 
     log_activity(
         current_user.id,
-        f"Approved {slots} extra device account slots"
+        f"Approved {slots} extra account slots for device"
     )
 
     flash("Extra account permission approved.")
@@ -1367,12 +1247,11 @@ def server_error(error):
 # ==========================================
 
 with app.app_context():
-
     db.create_all()
 
 
 # ==========================================
-# RUN APP
+# RUN
 # ==========================================
 
 if __name__ == "__main__":
@@ -1381,4 +1260,4 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
         debug=False
-                               )
+    )
